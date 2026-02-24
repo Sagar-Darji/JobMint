@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobMint — Automated Job Search & Apply</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <!-- Supabase JS SDK (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  </head>
+  <body>
+
+    <!-- ─── HEADER ─── -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-logo">JH</div>
+        <div class="brand-text">
+          <h1>JobMint</h1>
+          <p>Automated Job Search &amp; Apply — USA</p>
+        </div>
+      </div>
+      <div class="topbar-tabs">
+        <button class="tab-btn active" data-tab="main">Jobs</button>
+        <button class="tab-btn" data-tab="yc">🚀 YC Outreach</button>
+      </div>
+      <div class="topbar-right">
+        <span id="syncBadge" class="sync-badge sync-offline">— Offline</span>
+        <span id="backendBadge" class="badge-pill status-checking">● Connecting…</span>
+        <button id="saveProfileBtn" class="btn-ghost btn-sm">Save Profile</button>
+      </div>
+    </header>
+
+    <!-- ─── MAIN 3-PANEL LAYOUT ─── -->
+    <main class="workspace">
+
+      <!-- ── LEFT: SETUP ── -->
+      <aside class="panel panel-setup" id="setupPanel">
+        <div class="panel-title">
+          <span class="step-num">1</span>
+          <h2>Setup</h2>
+        </div>
+
+        <!-- Role chips -->
+        <div class="field-group">
+          <label>Target Roles <span class="hint">press Enter to add</span></label>
+          <div class="chip-input" id="rolesChipInput">
+            <div class="chips" id="roleChips"></div>
+            <input id="roleInputBox" placeholder="e.g. Backend Engineer" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Location chips -->
+        <div class="field-group">
+          <label>Locations <span class="hint">press Enter to add</span></label>
+          <div class="chip-input" id="locationsChipInput">
+            <div class="chips" id="locationChips"></div>
+            <input id="locationInputBox" placeholder="e.g. Remote, New York, SF" autocomplete="off" />
+          </div>
+          <div class="quick-locs">
+            <button class="quick-tag" data-loc="Remote">Remote</button>
+            <button class="quick-tag" data-loc="New York, NY">New York</button>
+            <button class="quick-tag" data-loc="San Francisco, CA">San Francisco</button>
+            <button class="quick-tag" data-loc="Austin, TX">Austin</button>
+            <button class="quick-tag" data-loc="Seattle, WA">Seattle</button>
+          </div>
+        </div>
+
+        <!-- Work type -->
+        <div class="field-group">
+          <label>Work Type</label>
+          <div class="toggle-group" id="workTypeGroup">
+            <button class="toggle-btn active" data-type="all">Any</button>
+            <button class="toggle-btn" data-type="remote">Remote</button>
+            <button class="toggle-btn" data-type="onsite">On-site</button>
+          </div>
+        </div>
+
+        <!-- Resume upload -->
+        <div class="field-group">
+          <label>Resume <span class="hint">PDF only</span></label>
+          <div class="upload-zone" id="uploadZone">
+            <input type="file" id="resumeFile" accept="application/pdf" />
+            <div class="upload-inner">
+              <span class="upload-icon">📄</span>
+              <span id="uploadLabel">Drop PDF or click to upload</span>
+            </div>
+          </div>
+          <p id="resumeExtractStatus" class="field-note"></p>
+        </div>
+
+        <!-- Contact info (auto-filled) -->
+        <div class="field-group">
+          <label>Contact <span class="hint">auto-filled from resume</span></label>
+          <input id="fullNameInput" class="text-input" placeholder="Full Name" />
+          <input id="emailInput" class="text-input" placeholder="Email Address" type="email" />
+          <input id="phoneInput" class="text-input" placeholder="Phone Number" />
+        </div>
+
+        <details class="linkedin-creds-section">
+          <summary class="linkedin-creds-toggle">🔗 LinkedIn credentials <span class="hint">(optional — for Easy Apply)</span></summary>
+          <div class="field-group" style="margin-top:8px">
+            <input id="linkedinEmailInput" class="text-input" placeholder="LinkedIn Email" type="email" autocomplete="off" />
+            <input id="linkedinPasswordInput" class="text-input" placeholder="LinkedIn Password" type="password" autocomplete="off" />
+            <p class="hint" style="margin:4px 0 0">Sent only when auto-applying to LinkedIn jobs. Never stored on any server.</p>
+          </div>
+        </details>
+
+        <!-- Hidden fields -->
+        <input id="resumeText" type="hidden" />
+        <input id="resumePathInput" type="hidden" />
+        <select id="jobTypeValue" hidden><option value="all" selected></option></select>
+
+        <!-- Find Jobs button -->
+        <button id="findJobsBtn" class="btn-primary btn-full">
+          <span id="findJobsBtnLabel">🔍 Find Jobs</span>
+        </button>
+
+        <!-- Progress -->
+        <div id="progressSection" class="progress-section hidden">
+          <div class="progress-meta">
+            <span id="progressStageLabel">Initializing…</span>
+            <span id="progressPct" class="mono">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-fill"></div>
+          </div>
+          <div id="progressLogs" class="log-scroll"></div>
+        </div>
+
+        <p id="setupNote" class="field-note mt-s"></p>
+      </aside>
+
+      <!-- ── CENTER: JOB STREAM ── -->
+      <section class="panel panel-jobs" id="jobsPanel">
+        <div class="panel-header-row">
+          <div class="panel-title">
+            <span class="step-num">2</span>
+            <h2>Jobs <span id="jobCount" class="count-badge">0</span></h2>
+          </div>
+          <div class="job-meta-row">
+            <span id="autoReadyBadge" class="meta-pill ready">0 auto-ready</span>
+            <span id="manualBadge" class="meta-pill">0 manual</span>
+          </div>
+        </div>
+
+        <div class="filters-row">
+          <input id="searchFilter" class="filter-input" placeholder="Filter by title or company…" />
+          <select id="sourceFilter" class="filter-select">
+            <option value="all">All Sources</option>
+          </select>
+          <select id="typeFilter" class="filter-select">
+            <option value="all">All Types</option>
+            <option value="remote">Remote</option>
+            <option value="onsite">On-site / Hybrid</option>
+          </select>
+        </div>
+
+        <div id="jobsList" class="jobs-list">
+          <div class="empty-state">
+            <p>Set up your roles &amp; resume, then click <strong>Find Jobs</strong></p>
+          </div>
+        </div>
+        <div id="paginationBar" class="pagination-bar hidden">
+          <button id="prevPageBtn" class="btn-ghost btn-sm">‹ Prev</button>
+          <span id="pageInfo" class="page-info">Page 1 of 1</span>
+          <button id="nextPageBtn" class="btn-ghost btn-sm">Next ›</button>
+        </div>
+      </section>
+
+      <!-- ── RIGHT: APPLY KIT ── -->
+      <aside class="panel panel-apply" id="applyPanel">
+        <div class="panel-title">
+          <span class="step-num">3</span>
+          <h2>Apply Kit</h2>
+        </div>
+
+        <div id="applyEmpty" class="apply-empty">
+          <div class="apply-empty-icon">←</div>
+          <p>Select a job to generate your AI-powered apply kit</p>
+        </div>
+
+        <div id="applyKit" class="hidden">
+          <!-- Selected job header -->
+          <div id="selectedJobCard" class="selected-job-card"></div>
+
+          <!-- Kit generating state -->
+          <div id="kitGenerating" class="kit-generating hidden">
+            <div class="spinner"></div>
+            <p>Generating your tailored kit…</p>
+          </div>
+
+          <!-- AI Kit content -->
+          <div id="kitContent" class="hidden">
+
+            <!-- Summary -->
+            <div class="kit-block" id="kbSummary">
+              <div class="kit-block-head collapsible-head" data-target="summaryBody">
+                <span class="kit-block-title">Targeted Summary</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button class="btn-copy" data-copy="summaryText">Copy</button>
+                  <button class="kit-toggle" data-target="summaryBody">▾</button>
+                </div>
+              </div>
+              <div id="summaryBody" class="kit-block-body">
+                <div id="summaryText" class="kit-text"></div>
+              </div>
+            </div>
+
+            <!-- Cover Letter -->
+            <div class="kit-block cover-letter-block" id="kbCoverLetter">
+              <div class="kit-block-head collapsible-head" data-target="coverLetterBody">
+                <span class="kit-block-title">✉ Cover Letter</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button class="btn-copy" data-copy="coverLetterText">Copy</button>
+                  <button class="kit-toggle collapsed" data-target="coverLetterBody">▸</button>
+                </div>
+              </div>
+              <div id="coverLetterBody" class="kit-block-body hidden">
+                <div id="coverLetterText" class="kit-text cover-letter"></div>
+              </div>
+            </div>
+
+            <!-- Resume Tweaks -->
+            <div class="kit-block" id="kbTweaks">
+              <div class="kit-block-head collapsible-head" data-target="tweaksBody">
+                <span class="kit-block-title">📝 Resume Tweaks</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button class="btn-copy" data-copy="resumeTweaksText">Copy</button>
+                  <button class="kit-toggle collapsed" data-target="tweaksBody">▸</button>
+                </div>
+              </div>
+              <div id="tweaksBody" class="kit-block-body hidden">
+                <div id="resumeTweaksContainer" class="tweaks-list"></div>
+                <div id="resumeTweaksText" class="hidden"></div>
+              </div>
+            </div>
+
+            <!-- Keywords -->
+            <div class="kit-block">
+              <div class="kit-block-head">
+                <span class="kit-block-title">🏷 Keywords to include</span>
+              </div>
+              <div id="keywordsContainer" class="keywords-row"></div>
+            </div>
+
+          </div>
+
+          <!-- Apply actions -->
+          <div class="apply-actions">
+            <button id="applyNowBtn" class="btn-primary btn-full">
+              Apply Now &amp; Copy Kit ↗
+            </button>
+            <button id="markAppliedBtn" class="btn-secondary btn-full">
+              ✓ Mark as Applied
+            </button>
+            <button id="autoApplyBtn" class="btn-auto-apply btn-full hidden">
+              ⚡ Auto-Apply (Playwright)
+            </button>
+            <div id="autoApplyProgress" class="auto-apply-progress hidden">
+              <div class="progress-meta">
+                <span id="autoApplyStage">Starting…</span>
+                <span id="autoApplyPct" class="mono">0%</span>
+              </div>
+              <div class="progress-track"><div id="autoApplyBar" class="progress-fill"></div></div>
+              <div id="autoApplyLogs" class="log-scroll" style="max-height:60px"></div>
+            </div>
+          </div>
+          <p id="applyStatusNote" class="field-note mt-s"></p>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- YC OUTREACH SECTION -->
+    <section id="ycSection" class="yc-section hidden">
+      <div class="yc-header">
+        <div>
+          <h2>🚀 YC Startup Outreach</h2>
+          <p class="yc-subtitle">Study products, find value-adds, email founders directly</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="ycBatchFilter" class="filter-select">
+            <option value="W25,S24,W24">Recent Batches (W25/S24/W24)</option>
+            <option value="W25">Winter 2025</option>
+            <option value="S24">Summer 2024</option>
+            <option value="W24">Winter 2024</option>
+            <option value="S23,W23">2023 Batches</option>
+          </select>
+          <button id="loadYcBtn" class="btn-primary">Load Companies</button>
+        </div>
+      </div>
+      <div class="yc-body">
+        <div class="yc-companies-panel">
+          <div id="ycCompaniesList" class="yc-companies-list">
+            <div class="empty-state">Click "Load Companies" to fetch recent YC startups</div>
+          </div>
+        </div>
+        <div class="yc-pitch-panel">
+          <div id="ycPitchEmpty" class="apply-empty">
+            <div class="apply-empty-icon">🎯</div>
+            <p>Select a company to generate a personalized outreach pitch</p>
+          </div>
+          <div id="ycPitchContent" class="hidden">
+            <div id="ycSelectedCompany" class="selected-job-card"></div>
+            <div id="ycPitchGenerating" class="kit-generating hidden">
+              <div class="spinner"></div>
+              <p>Analyzing product &amp; generating pitch…</p>
+            </div>
+            <div id="ycPitchResult" class="hidden">
+              <div class="kit-block">
+                <div class="kit-block-head">
+                  <span class="kit-block-title">🔍 Product Analysis</span>
+                </div>
+                <div id="ycAnalysisText" class="kit-text"></div>
+              </div>
+              <div class="kit-block">
+                <div class="kit-block-head">
+                  <span class="kit-block-title">💡 Value-Add Ideas</span>
+                </div>
+                <div id="ycValueAddText" class="kit-text"></div>
+              </div>
+              <div class="kit-block cover-letter-block">
+                <div class="kit-block-head">
+                  <span class="kit-block-title">✉ Outreach Email</span>
+                  <button class="btn-copy" data-copy="ycEmailText">Copy</button>
+                </div>
+                <div id="ycEmailText" class="kit-text" style="font-size:13px"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── TRACKER ─── -->
+    <section class="tracker-section" id="trackerSection">
+      <div class="tracker-header">
+        <h2>Application Tracker <span id="trackerCount" class="count-badge">0</span></h2>
+        <button id="clearTrackerBtn" class="btn-ghost btn-sm">Clear</button>
+      </div>
+      <div id="trackerBoard" class="tracker-board">
+        <div class="empty-state">No tracked applications yet.</div>
+      </div>
+    </section>
+
+    <script src="supabase-client.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

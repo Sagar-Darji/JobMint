@@ -1,0 +1,21 @@
+# Render deployment — uses Dockerfile.hosted (includes Playwright for auto-apply)
+services:
+  - type: web
+    name: jobmint-backend
+    env: docker
+    dockerfilePath: Dockerfile.hosted
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: HOST
+        value: 0.0.0.0
+      - key: AUTOAPPLY_HEADLESS
+        value: 1
+      - key: GROQ_API_KEY
+        sync: false          # Set this in Render dashboard
+      - key: SUPABASE_URL
+        value: https://pknxuepcmauglgncnynf.supabase.co
+      - key: SUPABASE_KEY
+        sync: false          # Set this in Render dashboard

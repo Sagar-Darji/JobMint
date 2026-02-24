@@ -1,0 +1,39 @@
+# Environment & secrets
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Uploads (user files)
+uploads/
+
+# Automation data & browser profile
+automation/.pw-profile/
+automation/.pw-profiles/
+automation/apply_history.json
+automation/manual_required.json
+automation/applied_successfully.json
+automation/learning_state.json
+automation/selector_suggestions.json
+automation/user_answers.json
+automation/debug/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs (internal only)
+AUTOMATION_DESIGN.md
+docs/
+
+# Logs
+*.log

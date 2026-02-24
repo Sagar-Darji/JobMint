@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+uploads/
+automation/.pw-profile/
+automation/debug/
+automation/apply_history.json
+automation/applied_successfully.json
+automation/manual_required.json
+docs/
+README.md
+*.md
