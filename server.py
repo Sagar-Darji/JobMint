@@ -1627,7 +1627,7 @@ Generate JSON with these keys:
 def main():
     os.chdir(BASE_DIR)
     port = int(os.environ.get("PORT", "8080"))
-    host = os.environ.get("HOST", "127.0.0.1")
+    host = os.environ.get("HOST", "0.0.0.0")
     server = ThreadingHTTPServer((host, port), JobMintHandler)
     print(f"JobMint server running at http://{host}:{port}")
     server.serve_forever()
